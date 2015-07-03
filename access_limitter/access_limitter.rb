@@ -14,8 +14,7 @@ config = {
   :target => file,
 }
 
-# ngx_mruby doesn't have sub_request method
-#unless r.sub_request?
+unless r.sub_request?
   limit = AccessLimitter.new r, cache, config
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
@@ -35,4 +34,4 @@ config = {
   if timeout
     Server.errlogger Server::LOG_NOTICE, "access_limitter: get timeout lock, #{r.filename}"
   end
-#end
+end
