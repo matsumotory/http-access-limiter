@@ -10,7 +10,8 @@ config = {
   :target => file,
 }
 
-unless r.sub_request?
+# ngx_mruby doesn't have sub_request method                                      
+#unless r.sub_request?
   limit = AccessLimitter.new r, cache, config
   # process-shared lock
   global_mutex.try_lock_loop(50000) do
@@ -23,4 +24,4 @@ unless r.sub_request?
       global_mutex.unlock
     end
   end
-end
+#end
