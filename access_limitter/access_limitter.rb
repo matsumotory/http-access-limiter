@@ -9,6 +9,7 @@ global_mutex = Userdata.new.shared_mutex
 
 file = r.filename
 
+# Also add config into access_limitter_end.rb
 config = {
   # access limmiter by target
   :target => file,
