@@ -1,6 +1,6 @@
 # http-access-limitter
 
-Detect the number of references to the requested file on Apache and Nginx using mruby code.
+Count the number of references to the requested file on Apache and Nginx using mruby code.
 
 http-access-limitter use same Ruby code between Apache(mod_mruby) and nginx(ngx_mruby).
 
