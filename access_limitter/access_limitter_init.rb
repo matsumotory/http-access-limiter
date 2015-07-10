@@ -14,7 +14,9 @@ class AccessLimitter
     @cache[@counter_key].to_i
   end
   def increment
-    @cache[@counter_key] = (@cache[@counter_key].to_i + 1).to_s
+    val = @cache[@counter_key].to_i + 1
+    @cache[@counter_key] = val.to_s
+    val
   end
   def decrement
     cur = @cache[@counter_key]
@@ -26,6 +28,7 @@ class AccessLimitter
     else
       @cache[@counter_key] = cnt.to_s
     end
+    cnt
   end
 end
 
