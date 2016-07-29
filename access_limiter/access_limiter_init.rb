@@ -1,6 +1,6 @@
 Userdata.new.shared_mutex = Mutex.new :global => true
 
-class AccessLimitter
+class AccessLimiter
   def initialize r, c, config
     @r = r
     @cache = c

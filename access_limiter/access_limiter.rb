@@ -9,30 +9,30 @@ global_mutex = Userdata.new.shared_mutex
 
 file = r.filename
 
-# Also add config into access_limitter_end.rb
+# Also add config into access_limiter_end.rb
 config = {
   # access limmiter by target
   :target => file,
 }
 
 unless r.sub_request?
-  limit = AccessLimitter.new r, cache, config
+  limit = AccessLimiter.new r, cache, config
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
     begin
       limit.increment
-      Server.errlogger Server::LOG_NOTICE, "access_limitter: file:#{r.filename} counter:#{limit.current}"
+      Server.errlogger Server::LOG_NOTICE, "access_limiter: file:#{r.filename} counter:#{limit.current}"
       if limit.current > threshold
-        Server.errlogger Server::LOG_NOTICE, "access_limitter: file:#{r.filename} reached threshold: #{threshold}: return #{Server::HTTP_SERVICE_UNAVAILABLE}"
+        Server.errlogger Server::LOG_NOTICE, "access_limiter: file:#{r.filename} reached threshold: #{threshold}: return #{Server::HTTP_SERVICE_UNAVAILABLE}"
         Server.return Server::HTTP_SERVICE_UNAVAILABLE
       end
     rescue => e
-      raise "AccessLimitter failed: #{e}"
+      raise "AccessLimiter failed: #{e}"
     ensure
       global_mutex.unlock
     end
   end
   if timeout
-    Server.errlogger Server::LOG_NOTICE, "access_limitter: get timeout lock, #{r.filename}"
+    Server.errlogger Server::LOG_NOTICE, "access_limiter: get timeout lock, #{r.filename}"
   end
 end

@@ -1,4 +1,4 @@
-config = {:namespace =>"aceess_limitter"}
+config = {:namespace =>"aceess_limiter"}
 
 c = Cache.new config
 c.clear
