@@ -1,9 +1,9 @@
 Userdata.new.shared_mutex = Mutex.new :global => true
 Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
 if Object.const_defined?(:MTest)
-  Userdata.new.shared_kvs = Vedis.new "/var/tmp/test.db"
+  Userdata.new.shared_kvs = Cache.new :filename => "/var/tmp/test.lmc"
 else
-  Userdata.new.shared_kvs = Vedis.new "/access_limiter/limit_list.db"
+  Userdata.new.shared_kvs = Cache.new :filename => "/access_limiter/limit_list.lmc"
 end
 
 class AccessLimiter
@@ -21,9 +21,10 @@ class AccessLimiter
 
     @limit_info = nil
     @key_exist  = false
+
     val = kvs.get(@counter_key)
-    unless val == ""
-      hash = eval(val)
+    unless val.nil?
+      hash = JSON.parse(val)
       if hash.is_a?(Hash)
         @limit_info = hash
         @key_exist  = true
@@ -104,24 +105,23 @@ if Object.const_defined?(:MTest)
 
     def setup
       # write test data
-      kvs = Vedis.new "/var/tmp/test.db"
+      kvs = Cache.new :filename => "/var/tmp/test.lmc"
       kvs.set(
         "/var/www/html/test1.php",
-        {
-          "max_clients" => 1,
-          "time_slots" => [
-            { "begin" => 900, "end" => 1000 },
-            { "begin" => 1700, "end" => 2000 }
+        '{
+          "max_clients" : 1,
+          "time_slots" : [
+            { "begin" : 900, "end" : 1000 },
+            { "begin" : 1700, "end" : 2000 }
           ]
-        }
+        }'
       )
       kvs.set(
         "/var/www/html/test2.php",
-        {
-          "max_clients" => 1,
-          "time_slots" => [
-          ]
-        }
+        '{
+          "max_clients" : 1,
+          "time_slots" : []
+        }'
       )
       kvs.close
 
@@ -190,8 +190,8 @@ if Object.const_defined?(:MTest)
       Userdata.new.shared_cache.clear
 
       # delete test kvs file
-      if File.exist?("/var/tmp/test.db")
-        File.delete("/var/tmp/test.db")
+      if File.exist?("/var/tmp/test.lmc")
+        File.delete("/var/tmp/test.lmc")
       end
     end
   end
