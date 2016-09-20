@@ -1,0 +1,33 @@
+version: '2'
+
+services:
+  apache:
+    build:
+      context: .
+      dockerfile: ./test/apache/Dockerfile
+    expose:
+      - "80"
+    networks:
+      - default
+    container_name: apache
+  modmruby:
+    build:
+      context: .
+      dockerfile: ./test/mod_mruby/Dockerfile
+    expose:
+      - "80"
+    networks:
+      - default
+    container_name: modmruby
+  abmruby:
+    build:
+      context: .
+      dockerfile: ./test/ab_mruby/Dockerfile
+    links:
+      - modmruby:modmruby
+      - apache:apache
+    networks:
+      - default
+    container_name: abmruby
+networks:
+  default:
