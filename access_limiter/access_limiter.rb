@@ -9,14 +9,15 @@ unless request.sub_request?
   }
 
   al = AccessLimiter.new(config)
+  filename = request.filename
 
   if al.key_exist?
     timeout = global_mutex.try_lock_loop(50000) do
       begin
         al.increment
-        Server.errlogger Server::LOG_DEBUG, "access_limiter: increment: file: #{request.filename} counter: #{al.current} max_clients: #{al.max_clients} time_slot: #{al.time_slots}"
+        Server.errlogger Server::LOG_DEBUG, "access_limiter: increment: file: #{filename} counter: #{al.current} max_clients: #{al.max_clients} time_slot: #{al.time_slots}"
         if al.limit?
-          Server.errlogger Server::LOG_NOTICE, "access_limiter: limit: file: #{request.filename} return: 503"
+          Server.errlogger Server::LOG_NOTICE, "access_limiter: limit: file: #{filename} return: 503"
           Server.return Server::HTTP_SERVICE_UNAVAILABLE
         end
       rescue => e
@@ -26,7 +27,7 @@ unless request.sub_request?
       end
     end
     if timeout
-      Server.errlogger Server::LOG_NOTICE, "access_limiter: failed: file: #{request.filename} get timeout lock"
+      Server.errlogger Server::LOG_NOTICE, "access_limiter: failed: file: #{filename} get timeout lock"
     end
   end
 end
