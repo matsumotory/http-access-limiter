@@ -10,6 +10,7 @@ http-access-limiter use same Ruby code between Apache(mod_mruby) and nginx(ngx_m
 
 ### Apache and mod_mruby
 - copy `access_limiter/` and `access_limiter_apache.conf` into `/etc/httpd/conf.d/`
+- mkdir /access_limiter
 ```apache
 LoadModule mruby_module modules/mod_mruby.so
 
@@ -104,11 +105,28 @@ unless request.sub_request?
 end
 ```
 
+## Test
+
+### Unit Test
+
+```
+rake
+```
+
+### E2E Test
+
+```
+rake e2e:run
+```
+
+- The difference between enable and disable access_limiter of performance
+- To return a 503 error when max_clients has reached the threshold
+- The race condition has not occurred
+
 ## depend mrbgem
 ```ruby
   conf.gem :github => 'matsumoto-r/mruby-localmemcache'
   conf.gem :github => 'matsumoto-r/mruby-mutex'
-  conf.gem :github => 'matsumoto-r/mruby-vedis'
 ```
 
 http-access-limiter has the counter of any key in process-shared memory. When Apache or nginx was restarted, the counter was freed.
