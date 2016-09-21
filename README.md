@@ -127,6 +127,7 @@ rake e2e:run
 ```ruby
   conf.gem :github => 'matsumoto-r/mruby-localmemcache'
   conf.gem :github => 'matsumoto-r/mruby-mutex'
+  conf.gem :github => 'iij/mrubyiijson' # or 'mattn/mruby-json'
 ```
 
 http-access-limiter has the counter of any key in process-shared memory. When Apache or nginx was restarted, the counter was freed.
