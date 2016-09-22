@@ -10,26 +10,26 @@ class AccessLimiter
   attr_accessor :request_time
 
   def initialize(config)
-    localtime = Time.new.localtime
-    time = localtime.hour.to_s + localtime.min.to_s
-    @request_time = time.to_i
-
     if config[:target].nil?
       raise "config[:target] is nil"
     end
     @counter_key = config[:target].to_s
+  end
 
-    @limit_info = nil
-    @key_exist  = false
-
-    val = kvs.get(@counter_key)
-    unless val.nil?
-      hash = JSON.parse(val)
-      if hash.is_a?(Hash)
-        @limit_info = hash
-        @key_exist  = true
-      end
+  def request_time
+    unless @request_time
+      localtime = Time.new.localtime
+      @request_time = (localtime.hour.to_s + localtime.min.to_s).to_i
     end
+    @request_time
+  end
+
+  def limit_info_json
+    @_limit_info_json ||= kvs[@counter_key]
+  end
+
+  def limit_info
+    @_limit_info ||= JSON.parse(limit_info_json)
   end
 
   def cache
@@ -45,16 +45,13 @@ class AccessLimiter
   end
 
   def increment
-    val = cache[@counter_key].to_i + 1
-    cache[@counter_key] = val.to_s
-    val
+    cache[@counter_key] = (current + 1).to_s
   end
 
   def decrement
-    cur = cache[@counter_key]
-    cnt = cur.to_i - 1
+    cnt = current - 1
     if cnt < 1
-      unless cur.nil?
+      unless current.nil?
         cache.delete @counter_key
       end
     else
@@ -63,28 +60,28 @@ class AccessLimiter
     cnt
   end
 
+
   def key_exist?
-    @key_exist
+    @_key_exist ||= limit_info_json.nil? ? false : true
   end
 
   def max_clients
-    @limit_info["max_clients"] if @key_exist
+    @_max_clients ||= limit_info["max_clients"].to_i if key_exist?
   end
 
   def time_slots
-    @limit_info["time_slots"] if @key_exist
+    @_time_slots ||= limit_info["time_slots"] if key_exist?
   end
 
   def time_slots_match?
-    return false unless @key_exist
+    return false unless key_exist?
 
-    time_slots = @limit_info["time_slots"]
     return true if time_slots.size == 0
 
     time_slots.each do |time_slot|
       begin_time = time_slot["begin"].to_i
       end_time   = time_slot["end"].to_i
-      if begin_time <= @request_time && end_time >= @request_time
+      if begin_time <= request_time && end_time >= request_time
         return true
       end
     end
@@ -92,8 +89,8 @@ class AccessLimiter
   end
 
   def limit?
-    return false unless @key_exist
-    if @limit_info["max_clients"].to_i < current
+    return false unless key_exist?
+    if max_clients < current
       return true if time_slots_match?
     end
     false
@@ -141,11 +138,11 @@ if Object.const_defined?(:MTest)
     end
 
     def test_localmemcache
-      @access_limiter.increment
-      @access_limiter.increment
-      @access_limiter.increment
-      @access_limiter.decrement
-      assert_equal(2, @access_limiter.current)
+      @test1.increment
+      @test1.increment
+      @test1.increment
+      @test1.decrement
+      assert_equal(2, @test1.current)
     end
 
     def test_key_exist
@@ -162,7 +159,6 @@ if Object.const_defined?(:MTest)
 
     def test_time_slots
       assert_equal(nil, @access_limiter.time_slots)
-
       assert_equal([ { "begin" => 900, "end" => 1000 }, { "begin" => 1700, "end" => 2000 } ], @test1.time_slots)
       assert_equal([], @test2.time_slots)
     end

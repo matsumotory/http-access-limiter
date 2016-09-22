@@ -3,13 +3,13 @@ request = Server::Request.new
 
 unless request.sub_request?
   global_mutex = Userdata.new.shared_mutex
+  filename = request.filename
 
   config = {
-    :target => request.filename,
+    :target => filename,
   }
 
   al = AccessLimiter.new(config)
-  filename = request.filename
 
   if al.key_exist?
     timeout = global_mutex.try_lock_loop(50000) do
