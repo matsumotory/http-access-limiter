@@ -1,0 +1,9 @@
+language: ruby
+sudo: required
+services:
+  - docker
+before_install:
+  - bundle install
+script:
+  - bundle exec rake
+
