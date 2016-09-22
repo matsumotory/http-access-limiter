@@ -16,7 +16,7 @@ done
 docker exec -t abmruby ab-mruby -m test/case_0/ab-mruby.conf.rb -M test/case_0/ab-mruby.test.rb http://apache/phpinfo.php
 
 echo "#"
-echo "# test case 1 (performance test, enable mod_mruby & access_limiter)"
+echo "# test case 1-1 (performance test, enable mod_mruby & access_limiter, exists limit config)"
 echo "# ab-mruby -m test/case_1/ab-mruby.conf.rb -M test/case_1/ab-mruby.test.rb http://modmruby/phpinfo.php"
 echo "#"
 until `docker exec -t abmruby curl -s http://modmruby/health_check.html -o /dev/null`
@@ -25,6 +25,17 @@ do
   sleep 1
 done
 docker exec -t abmruby ab-mruby -m test/case_1/ab-mruby.conf.rb -M test/case_1/ab-mruby.test.rb http://modmruby/phpinfo.php
+
+echo "#"
+echo "# test case 1-2 (performance test, enable mod_mruby & access_limiter, not exists limit config)"
+echo "# ab-mruby -m test/case_1/ab-mruby.conf.rb -M test/case_1/ab-mruby.test.rb http://modmruby/phpinfo_through_limit.php"
+echo "#"
+until `docker exec -t abmruby curl -s http://modmruby/health_check.html -o /dev/null`
+do
+  >&2 echo "pooling http..."
+  sleep 1
+done
+docker exec -t abmruby ab-mruby -m test/case_1/ab-mruby.conf.rb -M test/case_1/ab-mruby.test.rb http://modmruby/phpinfo_through_limit.php
 
 echo ""
 echo "#"
