@@ -32,3 +32,29 @@ class AccessLimiter
   end
 end
 
+if Object.const_defined?(:MTest)
+  class TestAccessLimiter < MTest::Unit::TestCase
+    def setup
+      @access_limiter = AccessLimiter.new(
+        :target => "/var/www/html/phpinfo.php"
+      )
+    end
+
+    def test_increment
+      @access_limiter.increment
+      @access_limiter.increment
+      assert_equal(2, @access_limiter.current)
+    end
+
+    def test_decrement
+      @access_limiter.decrement
+      assert_equal(1, @access_limiter.current)
+    end
+
+    def terdown
+      Cache.drop :namespace => "access_limiter"
+    end
+  end
+
+  MTest::Unit.new.run
+end
