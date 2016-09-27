@@ -15,7 +15,6 @@ LoadModule mruby_module modules/mod_mruby.so
 
 <IfModule mod_mruby.c>
   mrubyPostConfigMiddle         /etc/httpd/conf.d/access_limiter/access_limiter_init.rb cache
-  mrubyChildInitMiddle          /etc/httpd/conf.d/access_limiter/access_limiter_worker_init.rb cache
   <FilesMatch ^.*\.php$>
     mrubyAccessCheckerMiddle      /etc/httpd/conf.d/access_limiter/access_limiter.rb cache
     mrubyLogTransactionMiddle     /etc/httpd/conf.d/access_limiter/access_limiter_end.rb cache
@@ -31,7 +30,6 @@ LoadModule mruby_module modules/mod_mruby.so
 
 http {
   mruby_init /path/to/nginx/conf/access_limiter/access_limiter_init.rb cache;
-  mruby_init_worker /path/to/nginx/conf/access_limiter/access_limiter_worker_init.rb cache;
   server {
     location ~ \.php$ {
       mruby_access_handler /path/to/nginx/conf/access_limiter/access_limiter.rb cache;
@@ -48,7 +46,6 @@ threshold = 2
 
 Server = get_server_class
 r = Server::Request.new
-cache = Userdata.new.shared_cache
 global_mutex = Userdata.new.shared_mutex
 
 file = r.filename
@@ -59,7 +56,7 @@ config = {
 }
 
 unless r.sub_request?
-  limit = AccessLimiter.new r, cache, config
+  limit = AccessLimiter.new config
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
     begin
@@ -86,7 +83,6 @@ end
 ```ruby
 Server = get_server_class
 r = Server::Request.new
-cache = Userdata.new.shared_cache
 global_mutex = Userdata.new.shared_mutex
 
 file = r.filename
@@ -97,7 +93,7 @@ config = {
 }
 
 unless r.sub_request?
-  limit = AccessLimiter.new r, cache, config
+  limit = AccessLimiter.new config
   # process-shared lock
   global_mutex.try_lock_loop(50000) do
     begin

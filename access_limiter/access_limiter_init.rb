@@ -1,9 +1,9 @@
 Userdata.new.shared_mutex = Mutex.new :global => true
+Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
 
 class AccessLimiter
-  def initialize r, c, config
-    @r = r
-    @cache = c
+  def initialize config
+    @cache = Userdata.new.shared_cache
     @config = config
     if config[:target].nil?
       raise "config[:target] is nil"

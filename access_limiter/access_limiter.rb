@@ -4,7 +4,6 @@ threshold = 2
 
 Server = get_server_class
 r = Server::Request.new
-cache = Userdata.new.shared_cache
 global_mutex = Userdata.new.shared_mutex
 
 file = r.filename
@@ -16,7 +15,7 @@ config = {
 }
 
 unless r.sub_request?
-  limit = AccessLimiter.new r, cache, config
+  limit = AccessLimiter.new config
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
     begin
