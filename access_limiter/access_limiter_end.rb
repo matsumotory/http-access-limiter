@@ -11,7 +11,7 @@ config = {
 }
 
 unless r.sub_request?
-  limit = AccessLimiter.new r, cache, config
+  limit = AccessLimiter.new config
   # process-shared lock
   global_mutex.try_lock_loop(50000) do
     begin
