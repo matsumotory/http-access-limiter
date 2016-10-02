@@ -20,7 +20,7 @@ unless r.sub_request?
   timeout = global_mutex.try_lock_loop(50000) do
     begin
       limit.increment
-      Server.errlogger Server::LOG_NOTICE, "access_limiter: file:#{r.filename} counter:#{limit.current}"
+      Server.errlogger Server::LOG_NOTICE, "access_limiter: increment: file:#{r.filename} counter:#{limit.current}"
       if limit.current > threshold
         Server.errlogger Server::LOG_NOTICE, "access_limiter: file:#{r.filename} reached threshold: #{threshold}: return #{Server::HTTP_SERVICE_UNAVAILABLE}"
         Server.return Server::HTTP_SERVICE_UNAVAILABLE

@@ -16,7 +16,7 @@ unless r.sub_request?
   global_mutex.try_lock_loop(50000) do
     begin
       limit.decrement
-      Server.errlogger Server::LOG_NOTICE, "access_limiter_end: #{r.filename} #{limit.current}"
+      Server.errlogger Server::LOG_NOTICE, "access_limiter_end: decrement: #{r.filename} #{limit.current}"
     rescue => e
       raise "AccessLimiter failed: #{e}"
     ensure
