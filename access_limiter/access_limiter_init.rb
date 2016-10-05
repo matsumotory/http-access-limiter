@@ -2,6 +2,8 @@ Userdata.new.shared_mutex = Mutex.new :global => true
 Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
 
 class AccessLimiter
+  attr_reader :counter_key
+
   def initialize config
     @cache = Userdata.new.shared_cache
     @config = config
@@ -10,14 +12,17 @@ class AccessLimiter
     end
     @counter_key = config[:target].to_s
   end
+
   def current
     @cache[@counter_key].to_i
   end
+
   def increment
     val = @cache[@counter_key].to_i + 1
     @cache[@counter_key] = val.to_s
     val
   end
+
   def decrement
     cur = @cache[@counter_key]
     cnt = cur.to_i - 1
@@ -32,6 +37,44 @@ class AccessLimiter
   end
 end
 
+class MaxClientsHandler
+  attr_accessor :current_time
+
+  def initialize(access_limiter, filename)
+    Userdata.new.shared_config_store ||= Cache.new :filename => filename unless Userdata.new.shared_config_store
+    @access_limiter = access_limiter
+    @config_raw = Userdata.new.shared_config_store.get(@access_limiter.counter_key)
+  end
+
+  def config
+    @_config ||= JSON.parse(@config_raw) if @config_raw
+  end
+
+  def max_clients
+    config ? config["max_clients"].to_i : 0
+  end
+
+  def limit?
+    return true if config && max_clients > 1 && max_clients < @access_limiter.current && time_slots?(config["time_slots"])
+    false
+  end
+
+  def current_time
+    unless @current_time
+      c = Time.new.localtime
+      @current_time = c.hour.to_s + c.min.to_s
+    end
+    @current_time.to_i
+  end
+
+  def time_slots?(time_slots)
+    return true if time_slots.size == 0
+    time_slots.find do |t|
+      t["begin"].to_i <= current_time && t["end"].to_i >= current_time
+    end.nil? ? false : true
+  end
+end
+
 if Object.const_defined?(:MTest)
   class TestAccessLimiter < MTest::Unit::TestCase
     def setup
@@ -40,19 +83,125 @@ if Object.const_defined?(:MTest)
       )
     end
 
-    def test_increment
+    def test_counter
       @access_limiter.increment
       @access_limiter.increment
       assert_equal(2, @access_limiter.current)
-    end
 
-    def test_decrement
       @access_limiter.decrement
       assert_equal(1, @access_limiter.current)
     end
 
     def terdown
       Cache.drop :namespace => "access_limiter"
+    end
+  end
+
+  class TestMaxClientsHandler < MTest::Unit::TestCase
+    def setup
+      @config_store = "/var/tmp/max_clients_handler.lmc"
+
+      @access_limiter = AccessLimiter.new(
+        :target => "/var/www/html/always.php"
+      )
+      @max_clients_handler = MaxClientsHandler.new(
+        @access_limiter,
+        @config_store
+      )
+
+      @access_limiter_enable_timeslots = AccessLimiter.new(
+        :target => "/var/www/html/peaktime.php"
+      )
+      @max_clients_handler_enable_timeslots = MaxClientsHandler.new(
+        @access_limiter_enable_timeslots,
+        @config_store
+      )
+
+      @access_limiter_unlimited = AccessLimiter.new(
+        :target => "/var/www/html/unlimited.php"
+      )
+      @max_clients_handler_unlimited = MaxClientsHandler.new(
+        @access_limiter_unlimited,
+        @config_store
+      )
+
+      # Regist limit condition for max_clients_handler
+      c = Cache.new :filename => @config_store
+      c.set(
+        "/var/www/html/always.php",
+        '{
+          "max_clients" : 2,
+          "time_slots" : []
+        }'
+      )
+      c.set(
+        "/var/www/html/peaktime.php",
+        '{
+          "max_clients" : 2,
+          "time_slots" : [
+            { "begin" : 900, "end" : 1300 },
+            { "begin" : 1700, "end" : 2200 }
+          ]
+        }'
+      )
+      c.close
+    end
+
+    def test_limit
+      # max_clients:2 current:0 always
+      assert_false(@max_clients_handler.limit?)
+
+      # max_clients:2 current:1 always
+      @access_limiter.increment
+      assert_false(@max_clients_handler.limit?)
+
+      # max_clients:2 current:2 always
+      @access_limiter.increment
+      assert_false(@max_clients_handler.limit?)
+
+      # max_clients:2 current:3 always
+      @access_limiter.increment
+      assert(@max_clients_handler.limit?)
+
+      # max_clients:2 current:3 9:00-13:00/17:00-22:00
+      @access_limiter_enable_timeslots.increment
+      @access_limiter_enable_timeslots.increment
+      @access_limiter_enable_timeslots.increment
+      @max_clients_handler_enable_timeslots.current_time = 800
+      assert_false(@max_clients_handler_enable_timeslots.limit?)
+      # time of enable
+      @max_clients_handler_enable_timeslots.current_time = 900
+      assert(@max_clients_handler_enable_timeslots.limit?)
+    end
+
+    def test_time_slots
+      sample_time_slots = [
+        { "begin" => 900, "end" => 1300 },
+        { "begin" => 1700, "end" => 2200 },
+      ]
+
+      @max_clients_handler.current_time = 1000
+      assert(@max_clients_handler.time_slots?(Array.new))
+
+      @max_clients_handler_enable_timeslots.current_time = 800
+      assert_false(@max_clients_handler_enable_timeslots.time_slots?(sample_time_slots))
+
+      @max_clients_handler_enable_timeslots.current_time = 900
+      assert(@max_clients_handler_enable_timeslots.time_slots?(sample_time_slots))
+
+      @max_clients_handler_enable_timeslots.current_time = 1000
+      assert(@max_clients_handler_enable_timeslots.time_slots?(sample_time_slots))
+
+      @max_clients_handler_enable_timeslots.current_time = 1400
+      assert_false(@max_clients_handler_enable_timeslots.time_slots?(sample_time_slots))
+
+      @max_clients_handler_enable_timeslots.current_time = 2300
+      assert_false(@max_clients_handler_enable_timeslots.time_slots?(sample_time_slots))
+    end
+
+    def terdown
+      Cache.drop :namespace => "access_limiter"
+      Cache.drop @config_store
     end
   end
 

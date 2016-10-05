@@ -19,8 +19,8 @@ unless r.sub_request?
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
     begin
-      current = limit.current
       limit.increment
+      current = limit.current
       Server.errlogger Server::LOG_NOTICE, "access_limiter: increment: file:#{file} counter:#{current}"
       if current > threshold
         Server.errlogger Server::LOG_NOTICE, "access_limiter: file:#{file} reached threshold: #{threshold}: return #{Server::HTTP_SERVICE_UNAVAILABLE}"
