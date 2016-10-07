@@ -11,7 +11,7 @@ config = {
 }
 
 unless r.sub_request?
-  limit = AccessLimiter.new config
+  limit = AccessLimiter.new r, cache, config
   max_clients_handler = MaxClientsHandler.new(
     limit,
     "/access_limiter/max_clients_handler.lmc"
@@ -21,7 +21,7 @@ unless r.sub_request?
     global_mutex.try_lock_loop(50000) do
       begin
         limit.decrement
-        Server.errlogger Server::LOG_NOTICE, "access_limiter_end: decrement: #{file} #{limit.current}"
+        Server.errlogger Server::LOG_INFO, "access_limiter_end: decrement: file:#{file} counter:#{limit.current}"
       rescue => e
         raise "AccessLimiter failed: #{e}"
       ensure

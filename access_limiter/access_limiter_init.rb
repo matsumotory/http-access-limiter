@@ -4,8 +4,8 @@ Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
 class AccessLimiter
   attr_reader :counter_key
 
-  def initialize config
-    @cache = Userdata.new.shared_cache
+  def initialize(r, cache, config)
+    @cache = cache
     @config = config
     if config[:target].nil?
       raise "config[:target] is nil"
@@ -40,8 +40,8 @@ end
 class MaxClientsHandler
   attr_accessor :current_time
 
-  def initialize(access_limiter, filename)
-    Userdata.new.shared_config_store ||= Cache.new :filename => filename unless Userdata.new.shared_config_store
+  def initialize(access_limiter, config_store_path)
+    Userdata.new.shared_config_store ||= Cache.new :filename => config_store_path unless Userdata.new.shared_config_store
     @access_limiter = access_limiter
     @config_raw = Userdata.new.shared_config_store.get(@access_limiter.counter_key)
   end
@@ -55,8 +55,7 @@ class MaxClientsHandler
   end
 
   def limit?
-    return true if config && max_clients > 1 && max_clients < @access_limiter.current && time_slots?(config["time_slots"])
-    false
+    max_clients? && time_slots?(config["time_slots"])
   end
 
   def current_time
@@ -65,6 +64,10 @@ class MaxClientsHandler
       @current_time = c.hour.to_s + c.min.to_s
     end
     @current_time.to_i
+  end
+
+  def max_clients?
+    max_clients != 0 && max_clients < @access_limiter.current
   end
 
   def time_slots?(time_slots)
@@ -79,6 +82,8 @@ if Object.const_defined?(:MTest)
   class TestAccessLimiter < MTest::Unit::TestCase
     def setup
       @access_limiter = AccessLimiter.new(
+        nil,
+        Userdata.new.shared_cache,
         :target => "/var/www/html/phpinfo.php"
       )
     end
@@ -99,33 +104,8 @@ if Object.const_defined?(:MTest)
 
   class TestMaxClientsHandler < MTest::Unit::TestCase
     def setup
-      @config_store = "/var/tmp/max_clients_handler.lmc"
-
-      @access_limiter = AccessLimiter.new(
-        :target => "/var/www/html/always.php"
-      )
-      @max_clients_handler = MaxClientsHandler.new(
-        @access_limiter,
-        @config_store
-      )
-
-      @access_limiter_enable_timeslots = AccessLimiter.new(
-        :target => "/var/www/html/peaktime.php"
-      )
-      @max_clients_handler_enable_timeslots = MaxClientsHandler.new(
-        @access_limiter_enable_timeslots,
-        @config_store
-      )
-
-      @access_limiter_unlimited = AccessLimiter.new(
-        :target => "/var/www/html/unlimited.php"
-      )
-      @max_clients_handler_unlimited = MaxClientsHandler.new(
-        @access_limiter_unlimited,
-        @config_store
-      )
-
       # Regist limit condition for max_clients_handler
+      @config_store = "/var/tmp/max_clients_handler.lmc"
       c = Cache.new :filename => @config_store
       c.set(
         "/var/www/html/always.php",
@@ -145,9 +125,41 @@ if Object.const_defined?(:MTest)
         }'
       )
       c.close
+
+      @access_limiter = AccessLimiter.new(
+        nil,
+        Userdata.new.shared_cache,
+        :target => "/var/www/html/always.php"
+      )
+      @max_clients_handler = MaxClientsHandler.new(
+        @access_limiter,
+        @config_store
+      )
+
+      @access_limiter_enable_timeslots = AccessLimiter.new(
+        nil,
+        Userdata.new.shared_cache,
+        :target => "/var/www/html/peaktime.php"
+      )
+      @max_clients_handler_enable_timeslots = MaxClientsHandler.new(
+        @access_limiter_enable_timeslots,
+        @config_store
+      )
+
+      @access_limiter_unlimited = AccessLimiter.new(
+        nil,
+        Userdata.new.shared_cache,
+        :target => "/var/www/html/unlimited.php"
+      )
+      @max_clients_handler_unlimited = MaxClientsHandler.new(
+        @access_limiter_unlimited,
+        @config_store
+      )
     end
 
     def test_limit
+      Userdata.new.shared_cache.clear
+
       # max_clients:2 current:0 always
       assert_false(@max_clients_handler.limit?)
 
@@ -172,6 +184,25 @@ if Object.const_defined?(:MTest)
       # time of enable
       @max_clients_handler_enable_timeslots.current_time = 900
       assert(@max_clients_handler_enable_timeslots.limit?)
+    end
+
+    def test_max_clients
+      Userdata.new.shared_cache.clear
+
+      # max_clients:2 current:0
+      assert_false(@max_clients_handler.max_clients?)
+
+      # max_clients:2 current:1
+      @access_limiter.increment
+      assert_false(@max_clients_handler.max_clients?)
+
+      # max_clients:2 current:2
+      @access_limiter.increment
+      assert_false(@max_clients_handler.max_clients?)
+
+      # max_clients:2 current:3
+      @access_limiter.increment
+      assert(@max_clients_handler.max_clients?)
     end
 
     def test_time_slots

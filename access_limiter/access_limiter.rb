@@ -4,6 +4,7 @@ threshold = 2
 
 Server = get_server_class
 r = Server::Request.new
+cache = Userdata.new.shared_cache
 global_mutex = Userdata.new.shared_mutex
 
 file = r.filename
@@ -15,15 +16,15 @@ config = {
 }
 
 unless r.sub_request?
-  limit = AccessLimiter.new config
+  limit = AccessLimiter.new r, cache, config
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
     begin
       limit.increment
       current = limit.current
-      Server.errlogger Server::LOG_NOTICE, "access_limiter: increment: file:#{file} counter:#{current}"
+      Server.errlogger Server::LOG_INFO, "access_limiter: increment: file:#{file} counter:#{current}"
       if current > threshold
-        Server.errlogger Server::LOG_NOTICE, "access_limiter: file:#{file} reached threshold: #{threshold}: return #{Server::HTTP_SERVICE_UNAVAILABLE}"
+        Server.errlogger Server::LOG_INFO, "access_limiter: file:#{file} reached threshold: #{threshold}: return #{Server::HTTP_SERVICE_UNAVAILABLE}"
         Server.return Server::HTTP_SERVICE_UNAVAILABLE
       end
     rescue => e
@@ -33,6 +34,6 @@ unless r.sub_request?
     end
   end
   if timeout
-    Server.errlogger Server::LOG_NOTICE, "access_limiter: get timeout lock, #{file}"
+    Server.errlogger Server::LOG_INFO, "access_limiter: get timeout lock, #{file}"
   end
 end
