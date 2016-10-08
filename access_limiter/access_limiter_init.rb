@@ -46,6 +46,8 @@ class MaxClientsHandler
     @config_raw = Userdata.new.shared_config_store.get(@access_limiter.counter_key)
   end
 
+  # convert to hash limit condition of json
+  # @return [Hash] limit condition
   def config
     @_config ||= JSON.parse(@config_raw) if @config_raw
   end
@@ -54,6 +56,8 @@ class MaxClientsHandler
     config ? config["max_clients"].to_i : 0
   end
 
+  # corresponds the limit conditions?
+  # @return [true, false] matched limit conditions
   def limit?
     max_clients? && time_slots?(config["time_slots"])
   end
@@ -66,10 +70,14 @@ class MaxClientsHandler
     @current_time.to_i
   end
 
+  # current connection number has reached the limit conditions from access_limiter?
+  # @return [true, false] reached limit concurrent connections
   def max_clients?
     max_clients != 0 && max_clients < @access_limiter.current
   end
 
+  # request time match a limit conditions of time slots
+  # @return [true, false] matched limit conditions of time slots
   def time_slots?(time_slots)
     return true if time_slots.size == 0
     time_slots.find do |t|
