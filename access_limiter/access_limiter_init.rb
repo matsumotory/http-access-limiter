@@ -3,35 +3,60 @@ Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
 
 class AccessLimiter
   attr_reader :counter_key
+  attr_accessor :current_time
 
   def initialize(r, cache, config)
     @cache = cache
+    raise "config[:target] is nil" if config[:target].nil?
+    config[:expire_time] = 600 if config[:expire_time].nil?
     @config = config
-    if config[:target].nil?
-      raise "config[:target] is nil"
-    end
     @counter_key = config[:target].to_s
+    @current_time = Time.new.localtime.to_i
+  end
+
+  # delete old counter
+  # to keep the consistency when unintended woker process down
+  # @return [Fixnum] deleted count number
+  def keep_inconsistency
+    c = counter
+    old_size = c.size
+    if c.size > 0
+      c.delete_if { |v| v < @current_time - @config[:expire_time].to_i }
+      @cache[@counter_key] = c.to_s
+    end
+    old_size - c.size
+  end
+
+  def counter
+    cur_raw = @cache[@counter_key]
+    begin
+      cur = JSON.parse(cur_raw)
+    rescue
+      cur = Array.new
+    end
   end
 
   def current
-    @cache[@counter_key].to_i
+    counter.size
   end
 
   def increment
-    val = @cache[@counter_key].to_i + 1
-    @cache[@counter_key] = val.to_s
-    val
+    c = counter
+    c.push(@current_time)
+    @cache[@counter_key] = c.to_s
+    c.size
   end
 
   def decrement
-    cur = @cache[@counter_key]
-    cnt = cur.to_i - 1
+    c = counter
+    c.pop
+    cnt = c.size
     if cnt < 1
-      unless cur.nil?
+      unless c.nil?
         @cache.delete @counter_key
       end
     else
-      @cache[@counter_key] = cnt.to_s
+      @cache[@counter_key] = c.to_s
     end
     cnt
   end
@@ -103,6 +128,41 @@ if Object.const_defined?(:MTest)
 
       @access_limiter.decrement
       assert_equal(1, @access_limiter.current)
+
+      @access_limiter.decrement
+    end
+
+    def test_keep_inconsistency
+      @access_limiter.current_time = Time.local(2016, 01, 01, 10, 30, 00).to_i   # 2016/1/1 10:30:00 1451611800 expire: 600sec
+      @access_limiter.increment
+      @access_limiter.increment
+      assert_equal(0, @access_limiter.keep_inconsistency)
+      assert_equal(2, @access_limiter.current)
+
+      @access_limiter.current_time = Time.local(2016, 01, 01, 10, 40, 01).to_i   # 2016/1/1 10:40:01 1451612401 expire: 600sec
+      assert_equal(2, @access_limiter.keep_inconsistency)
+      assert_equal(0, @access_limiter.current)
+
+      # change expire_time
+      a = AccessLimiter.new(
+        nil,
+        Userdata.new.shared_cache,
+        :target => "/var/www/html/phpinfo.php",
+        :expire_time => 1200
+      )
+      a.current_time = Time.local(2016, 01, 01, 10, 30, 00).to_i   # 2016/1/1 10:30:00 1451611800 expire: 1200sec
+      a.increment
+      a.increment
+      assert_equal(0, a.keep_inconsistency)
+      assert_equal(2, a.current)
+
+      a.current_time = Time.local(2016, 01, 01, 10, 40, 01).to_i   # 2016/1/1 10:40:01 1451612401 expire: 1200sec
+      assert_equal(0, a.keep_inconsistency)
+      assert_equal(2, a.current)
+
+      a.current_time = Time.local(2016, 01, 01, 10, 50, 01).to_i   # 2016/1/1 10:50:01 1451613001 expire: 1200sec
+      assert_equal(2, a.keep_inconsistency)
+      assert_equal(0, a.current)
     end
 
     def terdown
