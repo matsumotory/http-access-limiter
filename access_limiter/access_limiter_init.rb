@@ -1,5 +1,6 @@
 Userdata.new.shared_mutex = Mutex.new :global => true
 Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
+Userdata.new.shared_config_store = Cache.new :filename => "/access_limiter/max_clients_handler.lmc"
 
 class AccessLimiter
   attr_reader :counter_key
@@ -65,10 +66,10 @@ end
 class MaxClientsHandler
   attr_accessor :current_time
 
-  def initialize(access_limiter, config_store_path)
-    Userdata.new.shared_config_store ||= Cache.new :filename => config_store_path unless Userdata.new.shared_config_store
+  def initialize(access_limiter, config_store)
+    #Userdata.new.shared_config_store ||= Cache.new :filename => config_store_path unless Userdata.new.shared_config_store
     @access_limiter = access_limiter
-    @config_raw = Userdata.new.shared_config_store.get(@access_limiter.counter_key)
+    @config_raw = config_store.get(@access_limiter.counter_key)
   end
 
   # convert to hash limit condition of json
@@ -173,16 +174,16 @@ if Object.const_defined?(:MTest)
   class TestMaxClientsHandler < MTest::Unit::TestCase
     def setup
       # Regist limit condition for max_clients_handler
-      @config_store = "/var/tmp/max_clients_handler.lmc"
-      c = Cache.new :filename => @config_store
-      c.set(
+      @config_store_path = "/var/tmp/max_clients_handler.lmc"
+      @config_store = Cache.new :filename => @config_store_path
+      @config_store.set(
         "/var/www/html/always.php",
         '{
           "max_clients" : 2,
           "time_slots" : []
         }'
       )
-      c.set(
+      @config_store.set(
         "/var/www/html/peaktime.php",
         '{
           "max_clients" : 2,
@@ -192,7 +193,6 @@ if Object.const_defined?(:MTest)
           ]
         }'
       )
-      c.close
 
       @access_limiter = AccessLimiter.new(
         nil,
@@ -300,7 +300,7 @@ if Object.const_defined?(:MTest)
 
     def terdown
       Cache.drop :namespace => "access_limiter"
-      Cache.drop @config_store
+      Cache.drop :filename => @config_store_path
     end
   end
 

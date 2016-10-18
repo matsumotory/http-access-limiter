@@ -3,6 +3,9 @@ r = Server::Request.new
 cache = Userdata.new.shared_cache
 global_mutex = Userdata.new.shared_mutex
 
+# max_clients_handler config store
+config_store = Userdata.new.shared_config_store
+
 file = r.filename
 
 # Also add config into access_limiter_end.rb
@@ -15,7 +18,7 @@ unless r.sub_request?
   limit = AccessLimiter.new r, cache, config
   max_clients_handler = MaxClientsHandler.new(
     limit,
-    "/access_limiter/max_clients_handler.lmc"
+    config_store
   )
   if max_clients_handler.config
     # process-shared lock
