@@ -20,7 +20,7 @@ unless r.sub_request?
   # process-shared lock
   timeout = global_mutex.try_lock_loop(50000) do
     begin
-      limit.keep_inconsistency
+      Server.errlogger Server::LOG_INFO, "access_limiter: cleanup_counter: file:#{file}" if limit.cleanup_counter
       limit.increment
       current = limit.current
       Server.errlogger Server::LOG_INFO, "access_limiter: increment: file:#{file} counter:#{current}"

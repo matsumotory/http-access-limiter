@@ -15,50 +15,37 @@ class AccessLimiter
     @current_time = Time.new.localtime.to_i
   end
 
-  # delete old counter
-  # to keep the consistency when unintended woker process down
-  # @return [Fixnum] deleted count number
-  def keep_inconsistency
-    c = counter
-    old_size = c.size
-    if c.size > 0
-      c.delete_if { |v| v < @current_time - @config[:expire_time].to_i }
-      @cache[@counter_key] = c.to_s
+  def cleanup_counter
+    cnt = current
+    ctime = create_time
+    if cnt > 0 && ctime > 0 && (ctime + @config[:expire_time]) < @current_time
+      @cache[@counter_key] = "0"
+      @cache["create_time_#{@counter_key}"] = ctime.to_s
+      true
+    else
+      false
     end
-    old_size - c.size
   end
 
-  def counter
-    cur_raw = @cache[@counter_key]
-    begin
-      cur = JSON.parse(cur_raw)
-    rescue
-      cur = Array.new
-    end
+  def create_time
+    @cache["create_time_#{@counter_key}"].to_i
   end
 
   def current
-    counter.size
+    @cache[@counter_key].to_i
   end
 
   def increment
-    c = counter
-    c.push(@current_time)
-    @cache[@counter_key] = c.to_s
-    c.size
+    cnt = current + 1
+    @cache["create_time_#{@counter_key}"] = @current_time.to_s if cnt == 1
+    @cache[@counter_key] = cnt.to_s
+    cnt
   end
 
   def decrement
-    c = counter
-    c.pop
-    cnt = c.size
-    if cnt < 1
-      unless c.nil?
-        @cache.delete @counter_key
-      end
-    else
-      @cache[@counter_key] = c.to_s
-    end
+    cnt = current - 1
+    cnt = 0 if cnt < 0
+    @cache[@counter_key] = cnt.to_s
     cnt
   end
 end
@@ -122,30 +109,23 @@ if Object.const_defined?(:MTest)
       )
     end
 
-    def test_counter
-      @access_limiter.increment
-      @access_limiter.increment
-      assert_equal(2, @access_limiter.current)
+    def test_cleanup_counter
+      Userdata.new.shared_cache.clear
 
-      @access_limiter.decrement
-      assert_equal(1, @access_limiter.current)
-
-      @access_limiter.decrement
-    end
-
-    def test_keep_inconsistency
       @access_limiter.current_time = Time.local(2016, 01, 01, 10, 30, 00).to_i   # 2016/1/1 10:30:00 1451611800 expire: 600sec
       @access_limiter.increment
       @access_limiter.increment
-      assert_equal(0, @access_limiter.keep_inconsistency)
+      assert_false(@access_limiter.cleanup_counter)
       assert_equal(2, @access_limiter.current)
 
       @access_limiter.current_time = Time.local(2016, 01, 01, 10, 40, 01).to_i   # 2016/1/1 10:40:01 1451612401 expire: 600sec
-      assert_equal(2, @access_limiter.keep_inconsistency)
+      @access_limiter.increment
+      assert(@access_limiter.cleanup_counter)
       assert_equal(0, @access_limiter.current)
 
-      # change expire_time
-      a = AccessLimiter.new(
+      Userdata.new.shared_cache.clear
+
+      a =  AccessLimiter.new(
         nil,
         Userdata.new.shared_cache,
         :target => "/var/www/html/phpinfo.php",
@@ -154,16 +134,32 @@ if Object.const_defined?(:MTest)
       a.current_time = Time.local(2016, 01, 01, 10, 30, 00).to_i   # 2016/1/1 10:30:00 1451611800 expire: 1200sec
       a.increment
       a.increment
-      assert_equal(0, a.keep_inconsistency)
+      assert_false(a.cleanup_counter)
       assert_equal(2, a.current)
 
       a.current_time = Time.local(2016, 01, 01, 10, 40, 01).to_i   # 2016/1/1 10:40:01 1451612401 expire: 1200sec
-      assert_equal(0, a.keep_inconsistency)
-      assert_equal(2, a.current)
+      a.increment
+      assert_false(a.cleanup_counter)
+      assert_equal(3, a.current)
 
       a.current_time = Time.local(2016, 01, 01, 10, 50, 01).to_i   # 2016/1/1 10:50:01 1451613001 expire: 1200sec
-      assert_equal(2, a.keep_inconsistency)
+      a.increment
+      assert(a.cleanup_counter)
       assert_equal(0, a.current)
+    end
+
+    def test_counter
+      Userdata.new.shared_cache.clear
+
+      @access_limiter.increment
+      @access_limiter.increment
+      assert_equal(2, @access_limiter.current)
+
+      @access_limiter.decrement
+      assert_equal(1, @access_limiter.current)
+
+      @access_limiter.decrement
+      assert_equal(0, @access_limiter.current)
     end
 
     def terdown
