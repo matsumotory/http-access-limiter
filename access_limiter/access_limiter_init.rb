@@ -92,7 +92,7 @@ class MaxClientsHandler
   # request time match a limit conditions of time slots
   # @return [true, false] matched limit conditions of time slots
   def time_slots?(time_slots)
-    return true if time_slots.size == 0
+    return true if time_slots.nil? || time_slots.size == 0
     time_slots.find do |t|
       t["begin"].to_i <= current_time && t["end"].to_i >= current_time
     end.nil? ? false : true
@@ -176,7 +176,7 @@ if Object.const_defined?(:MTest)
         "/var/www/html/always.php",
         '{
           "max_clients" : 2,
-          "time_slots" : []
+          "time_slots" : null
         }'
       )
       @config_store.set(
@@ -276,7 +276,7 @@ if Object.const_defined?(:MTest)
       ]
 
       @max_clients_handler.current_time = 1000
-      assert(@max_clients_handler.time_slots?(Array.new))
+      assert(@max_clients_handler.time_slots?(nil))
 
       @max_clients_handler_enable_timeslots.current_time = 800
       assert_false(@max_clients_handler_enable_timeslots.time_slots?(sample_time_slots))

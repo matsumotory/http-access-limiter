@@ -5,16 +5,14 @@ data = [
     "key"   => "/var/www/html/phpinfo.php",
     "value" => '{
       "max_clients" : 9999999,
-      "time_slots" : [
-      ]
+      "time_slots" : null
     }'
   },
   {
     "key"   => "/var/www/html/phpinfo_sleep_5.php",
     "value" => '{
       "max_clients" : 2,
-      "time_slots" : [
-      ]
+      "time_slots" : null
     }'
   },
   {
