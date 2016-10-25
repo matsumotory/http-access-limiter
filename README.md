@@ -281,7 +281,7 @@ VmSize: 28284224
   conf.gem :github => 'matsumoto-r/mruby-localmemcache'
   conf.gem :github => 'matsumoto-r/mruby-mutex'
   # use MaxClientsHandler
-  conf.gem :github => 'mattn/mruby-json'
+  conf.gem :github => 'iij/mruby-iijson' or 'mattn/mruby-json'
 ```
 
 http-access-limiter has the counter of any key in process-shared memory. When Apache or nginx was restarted, the counter was freed.
