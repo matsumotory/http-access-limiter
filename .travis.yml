@@ -1,0 +1,6 @@
+language: ruby
+sudo: required
+services:
+  - docker
+script:
+  - rake
