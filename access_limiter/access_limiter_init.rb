@@ -2,6 +2,9 @@ Userdata.new.shared_mutex = Mutex.new :global => true
 Userdata.new.shared_cache = Cache.new :namespace => "access_limiter"
 Userdata.new.shared_config_store = Cache.new :filename => "/access_limiter/max_clients_handler.lmc"
 
+# because it may have already increment counter
+Userdata.new.shared_cache.clear
+
 class AccessLimiter
   attr_reader :counter_key
   attr_accessor :current_time
